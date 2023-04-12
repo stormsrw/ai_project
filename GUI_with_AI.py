@@ -68,11 +68,12 @@ def winCondition(board, piece):
                 return True
 
 def evaluateBoard(window,piece):
+    #function determines value for board to see where best move could be
     score = 0
     opponent = playerPiece
     if piece == playerPiece:
         opponent = aiPiece
-
+# these statements score how well each move would be by how many pieces that are in a row
     if window.count(piece) == 4:
         score += 100
     elif window.count(piece) == 3 and window.count(empty)==1:
@@ -116,22 +117,23 @@ def scorePosition(board, piece):
             score += evaluateBoard(window,piece)
     return score
 def terminalNode(board):
-    return winCondition(board,playerPiece) or winCondition(board,aiPiece) or len(validLocation(board)) ==0
+    return winCondition(board,playerPiece) or winCondition(board,aiPiece) or len(getValidLocation(board)) ==0
 
 def miniMax(board, depth, alpha, beta, maxMixingPlayer):
+    #this is the function that determines how well the move will affect the future win conditions
     validLocations = getValidLocation(board)
     isTerminal = terminalNode(board)
     if depth == 0 or isTerminal:
         if isTerminal:
-            if winCondition(board, aiPiece):
+            if winCondition(board, aiPiece):#best option for AI
                 return (None, 10000000000000)
-            elif winCondition(board,playerPiece):
+            elif winCondition(board,playerPiece):#worst option for AI
                 return (None,-100000000000000)
             else:
                 return (None,0)
         else:
             return (None,scorePosition(board, aiPiece))
-    if maxMixingPlayer:#min
+    if maxMixingPlayer:#goes through the board for all valid moves and scores them based on best winning possiblity
         value = - math.inf
         columns = random.choice(validLocations)
         for column in validLocations:
@@ -145,24 +147,43 @@ def miniMax(board, depth, alpha, beta, maxMixingPlayer):
             alpha = max(alpha,value)
             if alpha >= beta:
                 break
-            return columns,value
-        else:#max
-            value = math.inf
-            columns = random.choice(validLocations)
-            for column in validLocations:
-                row = nextOpenRow(board,column)
-                boardCopy = board.copy()
-                Drop(boardCopy,row,column,playerPiece)
-                newScore = miniMax(boardCopy,depth-1,alpha,beta, True)[1]
-                if newScore < value:
-                    value = newScore
-                    columns = column
-                beta = min(beta,value)
-                if alpha >= beta:
-                    break
-                return columns,value
-def getValidLocation(board):#this is where is stopped 169 on original
+        return columns,value
+    else:#same as above but if worst move
+        value = math.inf
+        columns = random.choice(validLocations)
+        for column in validLocations:
+            row = nextOpenRow(board,column)
+            boardCopy = board.copy()
+            Drop(boardCopy,row,column,playerPiece)
+            newScore = miniMax(boardCopy,depth-1,alpha,beta, True)[1]
+            if newScore < value:
+                value = newScore
+                columns = column
+            beta = min(beta,value)
+            if alpha >= beta:
+                break
+        return columns,value
+def getValidLocation(board):#determins valid spots ai can take
+    validLocations = []
+    for column in range(col_count):
+        if validLocation(board,column):
+            validLocations.append(column)
+    return validLocations
+def bestMove(board,piece):#simple determines what is the best move for AI to take
+    validLocations = getValidLocation(board)
+    bestScore = 1000
+    bestColumn = random.choice(validLocations)
+    for column in validLocations:
+        row = nextOpenRow(board,column)
+        tempBoard = board.copy()
+        Drop(tempBoard,row,column,piece)
+        score = scorePosition(tempBoard,piece)
+        if score > bestScore:
+            bestScore = score
+            bestColumn = column
+    return bestColumn
 def drawBoard(board):
+    #creates the UI that we see
     for column in range(col_count):
         for row in range(row_count):
             pygame.draw.rect(screen,YELLOW,(column*square,row*square+square,square,square))
@@ -192,6 +213,7 @@ pygame.display.update()
 myFont = pygame.font.SysFont("monospace",75)
 
 while not gameOver:
+    #simple while loop that allows player to place a piece on the board and if they win sees that the condition is met and allows player to win
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             sys.exit()
@@ -201,8 +223,7 @@ while not gameOver:
             posx = event.pos[0]
             if turn == 0:
                 pygame.draw.circle(screen,RED,(posx,int(square/2)),radius)
-            else:
-                pygame.draw.circle(screen,BLUE,(posx,int(square/2)),radius)
+
         pygame.display.update()
 
         if event.type == pygame.MOUSEBUTTONDOWN:
@@ -220,24 +241,25 @@ while not gameOver:
                         label= myFont.render("Player 1 wins",1,RED)
                         screen.blit(label,(40,10))
                         gameOver = True
-            #Player 2 input
+                    turn += 1
+                    turn = turn % 2
+                    printBoard(board)
+                    drawBoard(board)
+    if turn == ai and not gameOver:
+        #allows the ai to place pieces and sees when their win condition is me
+        column,miniMaxScore= miniMax(board,5,-math.inf,math.inf,True)
+        if validLocation(board,column):
+            row = nextOpenRow(board,column)
+            Drop(board,row,column,aiPiece)
 
-            else:
-                posx = event.pos[0]
-                column=int(math.floor(posx/square))
-
-                if validLocation(board,column):
-                    row = nextOpenRow(board,column)
-                    Drop(board,row,column,2)
-
-                    if winCondition(board,2):
-                        label = myFont.render("Player 2 wins",1, BLUE)
-                        screen.blit(label,(40,10))
-                        gameOver = True
+            if winCondition(board,aiPiece):
+                label = myFont.render("Player 2 wins",1, BLUE)
+                screen.blit(label,(40,10))
+                gameOver = True
             printBoard(board)
             drawBoard(board)
 
             turn +=1
             turn = turn % 2
-            if gameOver:
-                pygame.time.wait(3000)
+    if gameOver:
+        pygame.time.wait(3000)
